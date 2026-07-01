@@ -1,4 +1,4 @@
-name: 'Giphy PR Comment'
+name: 'PR Giphy Comment'
 description: 'Automatically add a thank-you Giphy GIF to pull requests.'
 inputs:
   github-token:
