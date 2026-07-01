@@ -37788,26 +37788,61 @@ const Giphy = __nccwpck_require__(4931);
 
 async function run() {
   try {
-    const githubToken = core.getInput('github-token');
-    const giphyApiKey = core.getInput('giphy-api-key');
+    // Get inputs
+    const githubToken = core.getInput('github-token', { required: true });
+    const giphyApiKey = core.getInput('giphy-api-key', { required: true });
+
+    // Initialize clients
     const octokit = new Octokit({ auth: githubToken });
     const giphy = Giphy(giphyApiKey);
 
-    const { owner, repo, number: issue_number } = github.context.issue;
-    const prComment = await giphy.random('thank you');
+    // GitHub context
+    const { owner, repo } = github.context.repo;
+    const pr = github.context.payload.pull_request;
 
-    await octokit.issues.createComment({
+    if (!pr) {
+      core.setFailed('This action must be run on a pull_request event.');
+      return;
+    }
+
+    const issue_number = pr.number;
+    const prTitle = pr.title;
+    const prAuthor = pr.user.login;
+
+    core.info(`Repository: ${owner}/${repo}`);
+    core.info(`PR Number: ${issue_number}`);
+    core.info(`PR Title: ${prTitle}`);
+
+    // Fetch a random GIF
+    const gif = await giphy.random('thank you');
+    const gifUrl = gif.data.images.downsized.url;
+
+    // Create PR comment
+    const commentBody = [
+      '## 🎉 Thank you for your contribution!',
+      '',
+      `**PR:** #${issue_number}`,
+      `**Title:** ${prTitle}`,
+      `**Author:** @${prAuthor}`,
+      '',
+      `![Thank You GIF](${gifUrl})`,
+      '',
+      'We appreciate your contribution! 🚀'
+    ].join('\n');
+
+    const response = await octokit.issues.createComment({
       owner,
       repo,
       issue_number,
-      body: [
-        '### 🎉 Thank you for your contribution!',
-        '',
-        `![Giphy](${prComment.data.images.downsized.url})`
-      ].join('\n')
+      body: commentBody,
     });
 
-    core.setOutput('comment-url', prComment.data.images.downsized.url);
+    core.info(`Comment created: ${response.data.html_url}`);
+
+    core.setOutput('comment-url', response.data.html_url);
+    core.setOutput('gif-url', gifUrl);
+    core.setOutput('pr-number', issue_number.toString());
+
   } catch (error) {
     core.setFailed(error.message);
   }
